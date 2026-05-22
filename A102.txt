@@ -1,0 +1,104 @@
+ 
+
+REQUIREMENTS
+Mobile-Friendly: Tailored natively for standard smartphone browsers
+Progressive Web App (PWA)
+Modern UI (Facebook Vibe): Features a clean, containerized blue-and-gray color scheme with interactive feed-style elements it should be bright and not darked colored
+Static QR Architecture: The system uses a single static QR code System tailored for ALL employees
+ACTION BUTTON FOR Admin Access : Provides routing or modal authorization doors to enter management screens.
+ACTION BUTTON FOR Report Generation : Allows quick generation of attendance sheets, CSV download
+Automated Performance Calculations: Automatically computes total daily hours worked, flags lateness (Tardiness), and calculates early departures (Undertime).
+Tech Stack: Supabase for the database, authentication, and storage, and Vercel for frontend hosting and API middleware.
+Offline Resilience If mobile data drops or the office Wi-Fi goes offline, timestamps and action states are safely stored locally and automatically synced  the moment a network connection is re-established.
+Log In / Log Out Mechanics: When an employee presses the "Log In" or "Log Out" button, the system saves their user data and displays a success status message: "Your Log In was recorded successfully" or "Your Log Out was recorded successfully."
+Duplicate Punch Prevention: If an employee attempts to press the button again within less than 1 minute, the system will block the entry and display the warning: "Duplicate punch. Please wait 1 minute and try again."
+if user logs IT WILL DETECT SHIFT so that it will be easier to spot when making a report
+06:00 AM - 02:00 PM (Morning Shift)
+08:00 AM - 05:00 PM (Regular Day Shift)
+02:00 PM - 10:00 PM (Afternoon Shift)
+10:00 PM - 06:00 AM (Night Shift )
+
+
+Administrative Credentials & Security Tiers
+Root Administrator Account (Hidden Profile i am the creator so i still want access)
+
+    Username: lee (Case-flexible matching)
+
+    Password: metallica / METALLICA (Accepts both lowercase and uppercase variations)
+
+    Privileges: Full master authority. Can manage (Create, Read, Update, Delete) employee rosters, unbind devices, approve new hardware device micro-fingerprints, generate system QR codes, and completely manage (Create, Edit, Delete) additional administrative system accounts.
+
+Teams Administrator Account
+
+    Username: admin
+
+    Password: 2026pcc2026
+
+    Privileges: High-performance system operator. Can register, update, and delete employee profiles, unbind devices, approve pending device bindings, and generate system QR codes. This account is strictly blocked from viewing or modifying administrative account configurations or credentials.
+
+QR Generation Utility
+
+Both administrative tiers have full access to an on-demand QR code creation asset tool located directly inside their respective control panels.
+Admin Control Dashboard
+
+    User CRUD Panel: Full administrative capability to add new employees, edit existing user parameters (such as Rate per Day or PhilHealth parameters), or completely delete profiles.
+
+    Auditing & Reports: Features a print-optimized layout interface (@media print) for clean, borderless weekly or monthly physical paper ledger printing, as well as an option for instant CSV Spreadsheet Downloading.
+
+Database Architecture (Supabase)
+Target Ledger Table Schema
+
+The attendance logs table maps directly into a relational database model matching your accounting parameters:
+Column Header	Data Type	Description
+AC No	SERIAL / INT	Primary Auto-Incrementing Key
+EID	VARCHAR	Unique Employee Identification Number
+Name	VARCHAR	Employee full profile name
+Start Time	TIMESTAMP	Recorded entry clock marker
+End Time	TIMESTAMP	Recorded departure clock marker
+Date	DATE	Current logging calendar date
+Remarks	TEXT	Auto-generated system logs concatenated with user manual text box comments
+Tardiness	INT	Calculated late duration (minutes relative to the auto-detected shift)
+Undertime	INT	Calculated early departure duration (minutes relative to the auto-detected shift)
+Rate per Day	NUMERIC	Employee base daily wage reference - this will be put by admin to compute average monthly salary
+PhilHealth	NUMERIC	Standard statutory premium deduction parameter - this will be put by admin to compute average monthly salary
+👥 Registered Employee Seed Directory (Initial 20)
+
+
+EID	Full Name	
+251805	LEE LUZADAS	
+1	GIDDEL MACALIPAY
+2	MARVIN RIVERO	
+3	LEANDRO VALIDO	
+4	GERSON MENDOZA	
+5	MARK ANCEL GUTIERREZ
+6	JAGER MIK AGUILA
+7	CARL ANDRE NOCUM
+8	JACK KIRBY UY
+9	JERSON AMBAL
+10	ANGELO ALBAÑO
+11	GLENIEL PIONILLA
+12	JHON JOVERICK SOGOCIO
+13	JULIE ANN ALVAREZ
+14	JERONCIUS LABIAL
+15	ANGELO MARTINEZ
+16	KENT SIMOUNE PIÑOL
+17	MARY GRACE DIMATULAC
+18	JONH WILFRED ZARSUELO
+19	MARK JOHNCELL REGIO
+20	JOHN PAUL PORTE
+
+
+# Connect this local workspace directory to your active cloud engine project
+supabase link --project-ref crveyyodgdunwymwgfop
+
+Code snippet
+
+SUPABASE_URL="https://crveyyodgdunwymwgfop.supabase.co"
+SUPABASE_ANON_KEY="sb_publishable_Pia5f0KbtEmpSavSFGcZQA_8O8pTPJx"
+DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.crveyyodgdunwymwgfop.supabase.co:5432/postgres"
+
+# JWT Secret Target Parameter
+JWT_SECRET="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNydmV5eW9kZ2R1bnd5bXdnZm9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMjY0NTksImV4cCI6MjA5NDkwMjQ1OX0.Lu8UR2CU1XhFO2XZNaP-zbUh5MD84fOcj_2jTgEP4kw"
+
+
+

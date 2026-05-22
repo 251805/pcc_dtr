@@ -1,0 +1,6 @@
+{
+  "name": "Theory11",
+  "description": "Production-ready progressive attendance system tailored for mobile workforces.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,730 @@
+CODE.GS
+/* ------------------ Code.gs ------------------ */
+const TIMEZONE = 'Asia/Manila';
+const LOG_SHEET_NAME = 'timesheet';
+const USER_SHEET_NAME = 'users';
+const ADMIN_USERNAME = '251805';
+const ADMIN_PASSWORD = 'metallica';
+
+const SPECIAL_IMAGES = {
+  '251805': 'https://raw.githubusercontent.com/251805/sirpacheck/main/18.png',
+  
+};
+
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('Attendance System');
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function getAllowedUsers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const userSheet = ss.getSheetByName(USER_SHEET_NAME);
+  const data = userSheet.getRange(2, 1, userSheet.getLastRow() - 1, 2).getValues();
+  const map = {};
+  data.forEach(([name, eid]) => map[String(eid).trim()] = String(name).trim());
+  return map;
+}
+
+function recordAttendance(logData) {
+  const { eid, type, remarks } = logData;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+  const users = getAllowedUsers();
+  const name = users[eid];
+
+  if (!name) return { status: 'error', message: 'EID not found.' };
+
+  const now = new Date();
+  const currentDate = Utilities.formatDate(now, TIMEZONE, 'yyyy-MM-dd');
+  const currentTime = Utilities.formatDate(now, TIMEZONE, 'HH:mm:ss');
+
+  const data = sheet.getDataRange().getDisplayValues();
+
+  if (type === 'OUT') {
+    for (let i = data.length - 1; i >= 1; i--) {
+      const [rowEid,, date, timeIn, timeOut] = data[i];
+      if (rowEid === eid && date === currentDate && timeIn && !timeOut) {
+        sheet.getRange(i + 1, 5).setValue(currentTime);
+        if (remarks) sheet.getRange(i + 1, 6).setValue(remarks);
+        return { status: 'success', message: `${name}, your OUT log was recorded successfully!`, specialImage: SPECIAL_IMAGES[eid] || null };
+      }
+    }
+  }
+
+  sheet.appendRow([eid, name, currentDate, type === 'IN' ? currentTime : '', type === 'OUT' ? currentTime : '', remarks || '']);
+
+  return { status: 'success', message: `${name}, your ${type} log was recorded successfully!`, specialImage: SPECIAL_IMAGES[eid] || null };
+}
+
+/* =================== FIXED REPORT LOGIC =================== */
+
+function getMonthlyReport(eid, monthIndex) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+  const users = getAllowedUsers();
+  const name = users[eid];
+
+  if (!name) return { status: 'error', message: 'EID not found.' };
+
+  const rows = sheet.getDataRange().getDisplayValues();
+  const report = [];
+  let totalSeconds = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const [rowEid,, date, timeIn, timeOut, remarks] = rows[i];
+    if (rowEid !== eid || !date) continue;
+
+    const rowMonth = Number(date.split('-')[1]) - 1;
+    if (rowMonth !== monthIndex) continue;
+
+    let secondsWorked = 0;
+
+    if (timeIn && timeOut) {
+      secondsWorked = diffSeconds(timeIn, timeOut);
+      totalSeconds += secondsWorked;
+    }
+
+    report.push({
+      date,
+      in: timeIn || '-',
+      out: timeOut || '-',
+      hours: (secondsWorked / 3600).toFixed(2),
+      remarks: remarks || ''
+    });
+  }
+
+  return {
+    status: 'success',
+    name,
+    eid,
+    data: report,
+    totalHours: (totalSeconds / 3600).toFixed(2)
+  };
+}
+
+function diffSeconds(t1, t2) {
+  const [h1, m1, s1] = t1.split(':').map(Number);
+  const [h2, m2, s2] = t2.split(':').map(Number);
+  return (h2 * 3600 + m2 * 60 + s2) - (h1 * 3600 + m1 * 60 + s1);
+}
+
+function adminLogin(u, p) { return u === ADMIN_USERNAME && p === ADMIN_PASSWORD; }
+function getAdminUsers() { return SpreadsheetApp.getActive().getSheetByName(USER_SHEET_NAME).getDataRange().getValues(); }
+function updateAdminUsers(data) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(USER_SHEET_NAME);
+  sheet.clearContents();
+  sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+  return { status: 'success', message: 'User list updated successfully!' };
+}
+
+
+INDEX
+
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attendance Log</title>
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --secondary-color: #0056b3;
+      --accent-color: #17a2b8;
+      --bg-start: #e0f7ff;
+      --bg-end: #c4e6ff;
+    }
+    body { font-family: Arial,sans-serif; margin:0; padding:0; background: linear-gradient(135deg,var(--bg-start),var(--bg-end)); min-height:100vh; display:flex; justify-content:center; align-items:center; color:#333; }
+    .container { background:#fff; padding:30px 20px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-width:400px; width:90%; text-align:center; animation:fadeIn 0.8s ease-out;}
+    @keyframes fadeIn {from{opacity:0; transform:translateY(20px);} to{opacity:1; transform:translateY(0);}}
+    header {display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid var(--primary-color);}
+    .logo {width:50px;height:50px;object-fit:contain;margin:0 5px;}
+    h1 {font-size:1.5em; color: var(--secondary-color); margin:0;}
+    input[type=text], textarea {width:100%; padding:10px; margin:10px 0; border:1px solid #ccc; border-radius:8px; font-size:1em; box-sizing:border-box;}
+    input[type=text]:focus, textarea:focus {border-color: var(--primary-color); outline:none;}
+    textarea {resize: vertical; min-height:60px;}
+    .button-group {display:flex; justify-content:space-between; gap:10px; margin:20px 0;}
+    .button-group button {flex-grow:1; padding:12px; border:none; border-radius:8px; cursor:pointer; font-size:1.1em; font-weight:bold; color:white; transition:background-color 0.3s, transform 0.2s;}
+    #inBtn {background: linear-gradient(45deg,var(--primary-color),var(--accent-color));}
+    #outBtn {background: linear-gradient(45deg,#dc3545,#ff8c00);}
+    .button-group button:hover {transform:translateY(-2px); box-shadow:0 4px 10px rgba(0,0,0,0.1);}
+    .button-group button:active {transform:translateY(0);}
+    #status {padding:10px; margin:15px 0; border-radius:8px; text-align:left; font-weight:bold; display:none;}
+    #status.success {background:#d4edda;color:#155724;border:1px solid #c3e6cb;}
+    #status.error {background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;}
+    #specialImage {max-width:100%; height:auto; border-radius:10px; margin-top:15px; display:none;}
+  </style>
+</head>
+<body>
+<div class="container">
+<header>
+<img src="https://raw.githubusercontent.com/251805/sirpacheck/main/NEW%20Pagbilao%20Command%20Logo.png" class="logo">
+<h1>Attendance Log</h1>
+<img src="https://raw.githubusercontent.com/251805/sirpacheck/main/pag%20logo.png" class="logo">
+</header>
+
+<input type="text" id="eid" placeholder="Enter EID (Employee ID)">
+<textarea id="remarks" placeholder="Optional Remarks"></textarea>
+
+<div class="button-group">
+<button id="inBtn">Log IN</button>
+<button id="outBtn">Log OUT</button>
+</div>
+
+<div id="status"></div>
+<img id="specialImage">
+
+<div class="other-buttons">
+<button id="reportBtn" onclick="showReportDialog()">Report</button>
+<button id="adminBtn" onclick="showAdminDialog()">Admin</button>
+</div>
+</div>
+
+<div id="adminDialog"></div>
+<div id="reportDialog"></div>
+
+<?!= include('Report'); ?>
+<?!= include('Admin'); ?>
+
+<script>
+const eidInput = document.getElementById('eid');
+const remarksInput = document.getElementById('remarks');
+const statusDiv = document.getElementById('status');
+const specialImage = document.getElementById('specialImage');
+const lastLogTimes = {}; // Track per EID
+
+function showStatus(message, type, imageUrl=null){
+  statusDiv.textContent = message;
+  statusDiv.className=type;
+  statusDiv.style.display='block';
+  specialImage.style.display=imageUrl? 'block':'none';
+  if(imageUrl) specialImage.src=imageUrl;
+  setTimeout(()=>{statusDiv.style.display='none'; specialImage.style.display='none'; eidInput.value=''; remarksInput.value='';},5000);
+}
+
+window.onload = function(){
+  eidInput.value='';
+  remarksInput.value='';
+};
+
+function logEntry(type){
+  const eid = eidInput.value.trim();
+  const remarks = remarksInput.value.trim();
+  const now = new Date().getTime();
+  if(!eid){showStatus('Please enter your EID.','error'); return;}
+  if(lastLogTimes[eid] && lastLogTimes[eid][type] && now - lastLogTimes[eid][type] < 60000){
+    showStatus("Duplicate entry detected. Please wait at least 1 minute.",'error'); return;
+  }
+  const logData={eid,type,remarks};
+  google.script.run.withSuccessHandler(response=>{
+    if(response.status==='success'){
+      lastLogTimes[eid] = {...(lastLogTimes[eid]||{}), [type]:now};
+      showStatus(response.message,'success',response.specialImage);
+    } else { showStatus(response.message,'error'); }
+  }).recordAttendance(logData);
+}
+
+document.getElementById('inBtn').addEventListener('click',()=>logEntry('IN'));
+document.getElementById('outBtn').addEventListener('click',()=>logEntry('OUT'));
+</script>
+</body>
+</html>
+
+
+REPORT
+<script>
+    /*
+     * Report Dialog Client-Side Functions
+     */
+    const reportDialog = document.getElementById('reportDialog');
+
+    /**
+     * Opens the Report Pop-up.
+     */
+    function showReportDialog() {
+        const eid = document.getElementById('eid').value.trim();
+        if (!eid) {
+            showStatus('Please enter an EID before viewing a report.', 'error', null);
+            return;
+        }
+
+        const currentMonth = new Date().getMonth();
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        
+        let html = `
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeReportDialog()">&times;</span>
+                <h2>Monthly Attendance Report</h2>
+                <p>EID: <strong>${eid}</strong></p>
+                <select id="monthSelect">
+                    ${monthNames.map((name, index) => 
+                        `<option value="${index}" ${index === currentMonth ? 'selected' : ''}>${name}</option>`
+                    ).join('')}
+                </select>
+                <button onclick="generateReport('${eid}')" class="primary-btn">Generate Report</button>
+                <div id="reportSummary"></div>
+            </div>
+        `;
+        reportDialog.innerHTML = html;
+        reportDialog.style.display = 'flex';
+        // Generate the report for the current month on load
+        generateReport(eid);
+    }
+
+    /**
+     * Closes the Report Pop-up.
+     */
+    function closeReportDialog() {
+        reportDialog.style.display = 'none';
+    }
+
+    /**
+     * Fetches and displays the attendance report for the selected month.
+     * @param {string} eid - Employee ID.
+     */
+    function generateReport(eid) {
+        const monthSelect = document.getElementById('monthSelect');
+        const monthIndex = parseInt(monthSelect.value);
+        const summaryDiv = document.getElementById('reportSummary');
+        
+        summaryDiv.innerHTML = '<p>Loading report...</p>';
+
+        google.script.run
+            .withSuccessHandler(response => {
+                if (response.status === 'error') {
+                    summaryDiv.innerHTML = `<p class="report-error">${response.message}</p>`;
+                    return;
+                }
+                
+                let tableHtml = `
+                    <h3>Report for ${response.name} (${monthSelect.options[monthSelect.selectedIndex].text})</h3>
+                    <h4>Total Hours Worked: <strong>${response.totalHours}</strong></h4>
+                    <button onclick="printReport()" class="action-btn print-btn">Print Report</button>
+                    <button onclick="downloadCSV('${eid}', ${monthIndex}, '${response.name}')" class="action-btn download-btn">Download CSV</button>
+                    <table id="reportTable">
+                        <thead>
+                            <tr><th>Date</th><th>IN</th><th>OUT</th><th>Hours</th><th>Remarks</th></tr>
+                        </thead>
+                        <tbody>
+                            ${response.data.map(row => `
+                                <tr>
+                                    <td>${row.date}</td>
+                                    <td>${row.in}</td>
+                                    <td>${row.out}</td>
+                                    <td>${row.hours}</td>
+                                    <td>${row.remarks}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                summaryDiv.innerHTML = tableHtml;
+            })
+            .withFailureHandler(error => {
+                summaryDiv.innerHTML = `<p class="report-error">Error fetching report: ${error.message}</p>`;
+            })
+            .getMonthlyReport(eid, monthIndex);
+    }
+
+    /**
+     * Prints the report content inside the pop-up.
+     */
+    function printReport() {
+        const printContent = document.getElementById('reportSummary').innerHTML;
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow.document.write('<html><head><title>Attendance Report</title>');
+        // Include minimal necessary styles for printing
+        printWindow.document.write('<style>body{font-family:Arial,sans-serif;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #000;padding:8px;text-align:left;} h3,h4{color:#333;}</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printContent);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+    }
+
+    /**
+     * Downloads the report data as a CSV file.
+     * @param {string} eid - Employee ID.
+     * @param {number} monthIndex - Month index.
+     * @param {string} name - Employee Name.
+     */
+    function downloadCSV(eid, monthIndex, name) {
+        google.script.run
+            .withSuccessHandler(response => {
+                if (response.status === 'error') {
+                    alert('Could not download CSV: ' + response.message);
+                    return;
+                }
+                
+                let csv = "Name:," + name + "\n";
+                csv += "EID:," + eid + "\n";
+                csv += "Total Hours:," + response.totalHours + "\n\n";
+                csv += "Date,IN,OUT,Hours,Remarks\n";
+                
+                response.data.forEach(row => {
+                    csv += `${row.date},${row.in},${row.out},${row.hours},"${row.remarks.replace(/"/g, '""')}"\n`;
+                });
+
+                const monthName = document.getElementById('monthSelect').options[document.getElementById('monthSelect').selectedIndex].text;
+                const filename = `Attendance_Report_${name.replace(/\s/g, '_')}_${monthName}.csv`;
+                
+                // Create a hidden link element to trigger the download
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            })
+            .withFailureHandler(error => {
+                alert('Server Error on download: ' + error.message);
+            })
+            .getMonthlyReport(eid, monthIndex); // Re-fetch the data to ensure fresh CSV
+    }
+</script>
+
+<style>
+    /* Report & Admin Pop-up Styles (Reusable) */
+    .modal-content {
+        background-color: #fefefe;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        max-width: 90%;
+        width: 600px;
+        position: relative;
+        max-height: 90vh;
+        overflow-y: auto;
+        text-align: left;
+    }
+
+    .close-btn {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        position: absolute;
+        top: 10px;
+        right: 15px;
+    }
+
+    .close-btn:hover,
+    .close-btn:focus {
+        color: #000;
+        text-decoration: none;
+    }
+
+    #reportSummary table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        font-size: 0.9em;
+    }
+
+    #reportSummary th, #reportSummary td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    #reportSummary th {
+        background-color: var(--secondary-color);
+        color: white;
+    }
+    
+    #reportSummary h3 {
+        margin-top: 0;
+        color: var(--primary-color);
+    }
+    
+    #monthSelect, .primary-btn {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 5px;
+        font-size: 1em;
+    }
+    
+    .primary-btn {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+    
+    .action-btn {
+        padding: 8px 15px;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        cursor: pointer;
+        margin-right: 10px;
+    }
+    
+    .print-btn { background-color: #6c757d; }
+    .download-btn { background-color: #28a745; }
+    
+    /* Mobile adjustments for table */
+    @media (max-width: 600px) {
+        .modal-content {
+            width: 95%;
+            padding: 10px;
+        }
+        
+        #reportSummary table, #reportSummary thead, #reportSummary tbody, #reportSummary th, #reportSummary td, #reportSummary tr {
+            display: block;
+        }
+
+        #reportSummary thead tr {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
+        
+        #reportSummary td {
+            border: none;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            padding-left: 50%;
+            text-align: right;
+        }
+        
+        #reportSummary td:before {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            width: 45%;
+            padding-right: 10px;
+            white-space: nowrap;
+            text-align: left;
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+        
+        #reportSummary td:nth-of-type(1):before { content: "Date:"; }
+        #reportSummary td:nth-of-type(2):before { content: "IN:"; }
+        #reportSummary td:nth-of-type(3):before { content: "OUT:"; }
+        #reportSummary td:nth-of-type(4):before { content: "Hours:"; }
+        #reportSummary td:nth-of-type(5):before { content: "Remarks:"; }
+    }
+</style>
+
+
+ADMIN
+
+<script>
+    /*
+     * Admin Dialog Client-Side Functions
+     */
+    const adminDialog = document.getElementById('adminDialog');
+
+    /**
+     * Opens the Admin Pop-up and shows the login screen.
+     */
+    function showAdminDialog() {
+        let html = `
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeAdminDialog()">&times;</span>
+                <h2>Admin Login</h2>
+                <div id="adminLoginContent">
+                    <input type="text" id="adminUsername" placeholder="Username (EID)">
+                    <input type="password" id="adminPassword" placeholder="Password">
+                    <button onclick="adminLoginAttempt()" class="primary-btn" style="width:100%; margin-top:10px;">Login</button>
+                    <p id="adminStatus" style="color: red; margin-top: 10px;"></p>
+                </div>
+                <div id="adminPanel" style="display:none;">
+                    <h3>Manage Allowed EIDs</h3>
+                    <div id="adminTableContainer"></div>
+                    <div class="button-group">
+                        <button onclick="addRowToAdminTable()" class="primary-btn">Add Row</button>
+                        <button onclick="saveAdminData()" class="download-btn">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        adminDialog.innerHTML = html;
+        adminDialog.style.display = 'flex';
+    }
+
+    /**
+     * Closes the Admin Pop-up.
+     */
+    function closeAdminDialog() {
+        adminDialog.style.display = 'none';
+    }
+
+    /**
+     * Attempts to log in the admin.
+     */
+    function adminLoginAttempt() {
+        const username = document.getElementById('adminUsername').value;
+        const password = document.getElementById('adminPassword').value;
+        const statusP = document.getElementById('adminStatus');
+        
+        statusP.textContent = 'Verifying...';
+
+        google.script.run
+            .withSuccessHandler(isLoggedIn => {
+                if (isLoggedIn) {
+                    statusP.textContent = '';
+                    document.getElementById('adminLoginContent').style.display = 'none';
+                    document.getElementById('adminPanel').style.display = 'block';
+                    loadAdminPanelData();
+                } else {
+                    statusP.textContent = 'Invalid credentials.';
+                }
+            })
+            .withFailureHandler(error => {
+                statusP.textContent = 'Server Error: ' + error.message;
+            })
+            .adminLogin(username, password);
+    }
+    
+    /**
+     * Loads user data from the 'users' sheet and renders the editable table.
+     */
+    function loadAdminPanelData() {
+        const container = document.getElementById('adminTableContainer');
+        container.innerHTML = 'Loading user data...';
+        
+        google.script.run
+            .withSuccessHandler(userData => {
+                if (userData.length === 0) {
+                    container.innerHTML = '<p>No users found. Please add a row.</p>';
+                    return;
+                }
+                
+                // Create the table structure
+                let tableHtml = `<table id="userTable"><thead><tr><th>Full Name</th><th>EID</th><th>Action</th></tr></thead><tbody>`;
+                
+                // Start from the second row (index 1) to skip the header for the editable body
+                for (let i = 1; i < userData.length; i++) {
+                    const [name, eid] = userData[i];
+                    tableHtml += `
+                        <tr data-row-index="${i}">
+                            <td><input type="text" value="${name || ''}" class="admin-input-name"></td>
+                            <td><input type="text" value="${eid || ''}" class="admin-input-eid"></td>
+                            <td><button onclick="deleteRow(this)" class="action-btn delete-btn">Delete</button></td>
+                        </tr>
+                    `;
+                }
+                
+                tableHtml += `</tbody></table>`;
+                container.innerHTML = tableHtml;
+            })
+            .withFailureHandler(error => {
+                container.innerHTML = '<p style="color: red;">Error loading data: ' + error.message + '</p>';
+            })
+            .getAdminUsers();
+    }
+    
+    /**
+     * Adds a new, empty row to the editable user table.
+     */
+    function addRowToAdminTable() {
+        const tableBody = document.querySelector('#userTable tbody');
+        if (!tableBody) return;
+
+        const newRow = tableBody.insertRow();
+        newRow.innerHTML = `
+            <td><input type="text" value="" class="admin-input-name" placeholder="Name"></td>
+            <td><input type="text" value="" class="admin-input-eid" placeholder="EID"></td>
+            <td><button onclick="deleteRow(this)" class="action-btn delete-btn">Delete</button></td>
+        `;
+    }
+
+    /**
+     * Deletes a row from the editable user table.
+     * @param {HTMLElement} btn - The delete button element.
+     */
+    function deleteRow(btn) {
+        const row = btn.parentNode.parentNode;
+        row.parentNode.removeChild(row);
+    }
+
+    /**
+     * Gathers all data from the admin table and sends it to the server for saving.
+     */
+    function saveAdminData() {
+        const table = document.getElementById('userTable');
+        const rows = table.querySelectorAll('tbody tr');
+        
+        // Start with the header row, assuming the sheet always has one.
+        // We fetch the header during load and assume it's 'Full Name', 'EID'
+        let updatedData = [['Full Name', 'EID']]; 
+
+        rows.forEach(row => {
+            const name = row.querySelector('.admin-input-name').value.trim();
+            const eid = row.querySelector('.admin-input-eid').value.trim();
+            
+            if (name && eid) {
+                updatedData.push([name, eid]);
+            }
+        });
+
+        // Show a saving status
+        const saveBtn = document.querySelector('#adminPanel .download-btn');
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Saving...';
+        saveBtn.disabled = true;
+
+        google.script.run
+            .withSuccessHandler(response => {
+                alert(response.message);
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+                // Reload data to ensure the table reflects the saved state
+                loadAdminPanelData();
+            })
+            .withFailureHandler(error => {
+                alert('Error saving: ' + error.message);
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            })
+            .updateAdminUsers(updatedData);
+    }
+
+</script>
+
+<style>
+    /* Admin specific styles */
+    #adminPanel h3 {
+        color: var(--primary-color);
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+        margin-top: 20px;
+    }
+
+    #userTable {
+        width: 100%;
+        margin-bottom: 15px;
+        border-collapse: collapse;
+    }
+    
+    #userTable th, #userTable td {
+        border: 1px solid #ccc;
+        padding: 5px;
+        vertical-align: middle;
+    }
+    
+    .admin-input-name, .admin-input-eid {
+        width: 95%;
+        padding: 5px;
+        margin: 0;
+        box-sizing: border-box;
+    }
+    
+    .delete-btn {
+        background-color: #dc3545;
+        padding: 5px 8px;
+        font-size: 0.9em;
+    }
+</style>

@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fb-bg: #f0f2f5;
+  --color-fb-blue: #1877f2;
+  --color-fb-green: #42b72a;
+  --color-fb-red: #f02849;
+  --color-fb-card: #ffffff;
+  --color-fb-text: #1c1e21;
+  --color-fb-subtext: #606770;
+  --color-fb-border: #ccd0d5;
+}
+
+body {
+  background-color: var(--color-fb-bg);
+  color: var(--color-fb-text);
+  -webkit-font-smoothing: antialiased;
+}
